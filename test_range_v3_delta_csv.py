@@ -40,9 +40,18 @@ def main():
     end_date = _to_ts("2025-12-31")
 
     # load trained artifacts from v3_delta
-    model = load_model("v3_delta.keras")
-    scaler_X = pickle.load(open("v3_delta_scaler_X.pkl", "rb"))
-    scaler_y = pickle.load(open("v3_delta_scaler_y.pkl", "rb"))
+    try:
+        model = load_model("v3_delta.keras", compile=False)
+        print("Successfully loaded .keras model")
+    except Exception as e:
+        raise RuntimeError(f"Failed to load .keras model: {str(e)}")
+        
+    try:
+        scaler_X = pickle.load(open("v3_delta_scaler_X.pkl", "rb"))
+        scaler_y = pickle.load(open("v3_delta_scaler_y.pkl", "rb"))
+        print("Successfully loaded scalers")
+    except Exception as e:
+        raise RuntimeError(f"Failed to load scalers: {str(e)}")
 
     df = pd.read_csv(csv_path)
 

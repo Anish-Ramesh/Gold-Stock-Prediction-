@@ -13,7 +13,7 @@ app = Flask(__name__)
 
 # --- Global Configuration ---
 CSV_PATH = "TataPower_2005_2025.csv"
-MODEL_PATH = "v3_delta.h5"  # Using .h5 for better compatibility with Keras versions
+MODEL_PATH = "v3_delta.keras"  # Using modern .keras format for Keras 3.x
 SCALER_X_PATH = "v3_delta_scaler_X.pkl"
 SCALER_Y_PATH = "v3_delta_scaler_y.pkl"
 WINDOW_SIZE = 14
@@ -38,7 +38,7 @@ def rmse(a, b): return float(np.sqrt(np.mean((a - b) ** 2)))
 def get_predictions(start_date_str, end_date_str):
     # Load Artifacts
     try:
-        model = load_model(MODEL_PATH)
+        model = load_model(MODEL_PATH, compile=False)
         with open(SCALER_X_PATH, "rb") as f: scaler_X = pickle.load(f)
         with open(SCALER_Y_PATH, "rb") as f: scaler_y = pickle.load(f)
     except Exception as e:
