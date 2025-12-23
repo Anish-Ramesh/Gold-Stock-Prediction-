@@ -1,6 +1,8 @@
 # Tata Power Next-Day Close Price Prediction
 
-This project trains and tests an LSTM model to predict **next-day closing prices** for **Tata Power** using daily OHLCV data and technical indicators.
+This project trains and tests an LSTM model to predict **next-day closing prices** for equities using daily OHLCV data and technical indicators.
+
+The pipeline is **generic for any company/stock** as long as you provide a similar daily CSV (with Date, Open, High, Low, Close/Price, Volume). In this repository we have **tested it on Tata stocks (Tata Power / Tata Motors)** and obtained good results.
 
 ## Files
 - **v3_delta.py**  

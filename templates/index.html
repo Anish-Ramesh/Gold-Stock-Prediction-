@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stock Prediction Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #f8f9fa; }
+        .card { box-shadow: 0 4px 6px rgba(0,0,0,0.1); border: none; margin-bottom: 20px; }
+        .metric-box { text-align: center; padding: 15px; }
+        .metric-val { font-size: 1.5rem; font-weight: bold; color: #2c3e50; }
+        .metric-label { font-size: 0.9rem; color: #7f8c8d; text-transform: uppercase; }
+        .table-responsive { max-height: 500px; overflow-y: auto; }
+        .text-neg { color: #e74c3c; font-weight: bold; } /* Red for drops */
+        .text-pos { color: #27ae60; font-weight: bold; } /* Green for gains */
+    </style>
+</head>
+<body>
+
+<div class="container py-4">
+    <div class="row mb-4">
+        <div class="col">
+            <h2 class="fw-bold text-primary">📈 Stock Prediction Dashboard</h2>
+            <p class="text-muted">v3_delta Model Evaluation</p>
+        </div>
+    </div>
+
+    <div class="card p-4">
+        <form method="POST" class="row g-3 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label">Start Date</label>
+                <input type="date" name="start_date" class="form-control" value="{{ start_date }}" required>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">End Date</label>
+                <input type="date" name="end_date" class="form-control" value="{{ end_date }}" required>
+            </div>
+            <div class="col-md-4">
+                <button type="submit" class="btn btn-primary w-100">Run Prediction</button>
+            </div>
+        </form>
+    </div>
+
+    {% if error %}
+        <div class="alert alert-danger">{{ error }}</div>
+    {% endif %}
+
+    {% if metrics %}
+    <div class="row">
+        <div class="col-md-3">
+            <div class="card metric-box">
+                <div class="metric-val">{{ metrics.MAE }}</div>
+                <div class="metric-label">MAE</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card metric-box">
+                <div class="metric-val">{{ metrics.RMSE }}</div>
+                <div class="metric-label">RMSE</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card metric-box">
+                <div class="metric-val">{{ metrics.Accuracy_50 }}</div>
+                <div class="metric-label">Within ±50</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card metric-box">
+                <div class="metric-val text-danger">{{ metrics.Drop_Predictions }}</div>
+                <div class="metric-label">Predicted Drops</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card p-3">
+        <h5 class="card-title">Actual vs Predicted Prices</h5>
+        <img src="data:image/png;base64,{{ plot_url }}" class="img-fluid rounded" alt="Prediction Chart">
+    </div>
+
+    <div class="card p-3">
+        <h5 class="card-title mb-3">Detailed Predictions</h5>
+        <div class="table-responsive">
+            <table class="table table-striped table-hover">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Date (t)</th>
+                        <th>Actual Close (t+1)</th>
+                        <th>Predicted Close (t+1)</th>
+                        <th>Abs Error</th>
+                        <th>Trend (Pred)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in table_data %}
+                    <tr>
+                        <td>{{ row['Date'].strftime('%Y-%m-%d') }}</td>
+                        <td>{{ "%.2f"|format(row['Actual_Next_Close']) }}</td>
+                        <td>{{ "%.2f"|format(row['Predicted_Next_Close']) }}</td>
+                        <td>{{ "%.2f"|format(row['Error']) }}</td>
+                        <td>
+                            {% if row['LogRet_Pred'] < 0 %}
+                                <span class="text-neg">▼ Drop</span>
+                            {% else %}
+                                <span class="text-pos">▲ Rise</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+</body>
+</html>
