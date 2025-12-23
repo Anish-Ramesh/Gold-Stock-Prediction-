@@ -13,7 +13,7 @@ app = Flask(__name__)
 
 # --- Global Configuration ---
 CSV_PATH = "TataPower_2005_2025.csv"
-MODEL_PATH = "v3_delta_savedmodel"
+MODEL_PATH = "v3_delta.keras"
 SCALER_X_PATH = "v3_delta_scaler_X.pkl"
 SCALER_Y_PATH = "v3_delta_scaler_y.pkl"
 WINDOW_SIZE = 14
@@ -126,7 +126,13 @@ def get_predictions(start_date_str, end_date_str):
     X_scaled = scaler_X.transform(X_test.reshape(-1, n_features)).reshape(X_test.shape)
     y_scaled = scaler_y.transform(y_test.reshape(-1, 1)).flatten()
 
-    pred_scaled = model.predict(X_scaled, verbose=0).reshape(-1, 1)
+    pred_outputs = model.predict(X_scaled, verbose=0)
+
+    if isinstance(pred_outputs, dict):
+        pred_scaled = pred_outputs["price"].reshape(-1, 1)
+    else:
+        pred_scaled = np.asarray(pred_outputs).reshape(-1, 1)
+
     pred_logret = scaler_y.inverse_transform(pred_scaled).flatten()
     
     # Reconstruct Price
@@ -196,5 +202,5 @@ def index():
 
 if __name__ == "__main__":
     import os
-    port = int(os.environ.get("PORT", 5000))
+    port = int(os.environ.get("PORT", 3000))
     app.run(host="0.0.0.0", port=port)

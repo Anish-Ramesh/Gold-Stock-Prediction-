@@ -40,7 +40,7 @@ def main():
     end_date = _to_ts("2025-12-31")
 
     # load trained artifacts from v3_delta
-    model = load_model("v3_delta_savedmodel")
+    model = load_model("v3_delta.keras")
     scaler_X = pickle.load(open("v3_delta_scaler_X.pkl", "rb"))
     scaler_y = pickle.load(open("v3_delta_scaler_y.pkl", "rb"))
 
@@ -122,9 +122,18 @@ def main():
     X_test_scaled = scaler_X.transform(X_test.reshape(-1, n_features)).reshape(X_test.shape)
     y_test_scaled = scaler_y.transform(y_test.reshape(-1, 1)).flatten()
 
-    pred_y_scaled = model.predict(X_test_scaled, verbose=0).reshape(-1, 1)
+    pred_outputs = model.predict(X_test_scaled, verbose=0)
+
+    if isinstance(pred_outputs, dict):
+        pred_y_scaled = pred_outputs["price"].reshape(-1, 1)
+    else:
+        pred_y_scaled = np.asarray(pred_outputs).reshape(-1, 1)
+
     pred_logret = scaler_y.inverse_transform(pred_y_scaled).flatten()
     actual_logret = scaler_y.inverse_transform(y_test_scaled.reshape(-1, 1)).flatten()
+
+    print("Min predicted logret:", float(np.min(pred_logret)))
+    print("Max predicted logret:", float(np.max(pred_logret)))
 
     pred_price_t1 = price_t_test * np.exp(pred_logret)
     actual_price_t1 = price_t1_test

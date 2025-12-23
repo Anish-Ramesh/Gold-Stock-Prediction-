@@ -6,8 +6,8 @@ import matplotlib.pyplot as plt
 
 from sklearn.preprocessing import StandardScaler, RobustScaler
 
-from keras.models import Sequential, load_model
-from keras.layers import LSTM, Dense, Dropout
+from keras.models import Sequential, load_model, Model
+from keras.layers import LSTM, Dense, Dropout, Input
 from keras.callbacks import EarlyStopping, ModelCheckpoint
 from keras.losses import Huber
 
@@ -87,12 +87,16 @@ def main():
     df["Price_next"] = df["Price"].shift(-1)
     df["LogRet_t1"] = np.log(df["Price_next"] / df["Price"])
 
+    # direction target: 1 if next-day log-return > 0, else 0
+    df["Dir_t1"] = (df["LogRet_t1"] > 0).astype(int)
+
     df = df.dropna(subset=["Price_next", "LogRet_t1"]).reset_index(drop=True)
 
     features = base_features + ["Volatility", "RSI", "Momentum"]
 
     X_all = df[features].values.astype(float)
     y_all = df["LogRet_t1"].values.astype(float)
+    y_dir_all = df["Dir_t1"].values.astype(int)
     date_t = df["Date"].values
     price_t = df["Price"].values.astype(float)
     price_t1 = df["Price_next"].values.astype(float)
@@ -101,16 +105,18 @@ def main():
         raise RuntimeError("Not enough rows to create sequences.")
 
     # build sequences: each sample uses last `window` days up to t to predict t+1 log-return
-    X_seq, y_seq, d_t_seq, price_t_seq, price_t1_seq = [], [], [], [], []
+    X_seq, y_seq, y_dir_seq, d_t_seq, price_t_seq, price_t1_seq = [], [], [], [], [], []
     for i in range(window - 1, len(df) - 1):
         X_seq.append(X_all[i - window + 1 : i + 1])
         y_seq.append(y_all[i])
+        y_dir_seq.append(y_dir_all[i])
         d_t_seq.append(date_t[i])
         price_t_seq.append(price_t[i])
         price_t1_seq.append(price_t1[i])
 
     X_seq = np.asarray(X_seq)
     y_seq = np.asarray(y_seq)
+    y_dir_seq = np.asarray(y_dir_seq)
     d_t_seq = pd.to_datetime(np.asarray(d_t_seq))
     price_t_seq = np.asarray(price_t_seq)
     price_t1_seq = np.asarray(price_t1_seq)
@@ -121,6 +127,7 @@ def main():
 
     X_train, y_train = X_seq[train_mask], y_seq[train_mask]
     X_test, y_test = X_seq[test_mask], y_seq[test_mask]
+    y_dir_train, y_dir_test = y_dir_seq[train_mask], y_dir_seq[test_mask]
     d_t_test = d_t_seq[test_mask]
     price_t_test = price_t_seq[test_mask]
     price_t1_test = price_t1_seq[test_mask]
@@ -145,24 +152,33 @@ def main():
     y_train_scaled = scaler_y.transform(y_train.reshape(-1, 1)).flatten()
     y_test_scaled = scaler_y.transform(y_test.reshape(-1, 1)).flatten()
 
-    # model
-    model = Sequential([
-        LSTM(128, return_sequences=True, input_shape=(window, n_features)),
-        Dropout(0.25),
-        LSTM(64),
-        Dropout(0.25),
-        Dense(1),
-    ])
+    # model: shared LSTM trunk with two heads
+    inputs = Input(shape=(window, n_features))
+    x = LSTM(128, return_sequences=True)(inputs)
+    x = Dropout(0.25)(x)
+    x = LSTM(64)(x)
+    x = Dropout(0.25)(x)
 
-    model.compile(optimizer="adam", loss=Huber(delta=1.0))
+    price_output = Dense(1, name="price")(x)
+    direction_output = Dense(1, activation="sigmoid", name="direction")(x)
+
+    model = Model(inputs=inputs, outputs={"price": price_output, "direction": direction_output})
+
+    model.compile(
+        optimizer="adam",
+        loss={
+            "price": Huber(delta=1.0),
+            "direction": "binary_crossentropy",
+        },
+    )
 
     early_stop = EarlyStopping(monitor="val_loss", patience=10, restore_best_weights=True)
-    checkpoint_path = "v3_delta_savedmodel"
+    checkpoint_path = "v3_delta.keras"
     checkpoint = ModelCheckpoint(checkpoint_path, monitor="val_loss", save_best_only=True)
 
     model.fit(
         X_train_scaled,
-        y_train_scaled,
+        {"price": y_train_scaled, "direction": y_dir_train},
         validation_split=0.1,
         epochs=80,
         batch_size=32,
@@ -172,10 +188,22 @@ def main():
 
     best_model = load_model(checkpoint_path)
 
-    # predictions (log-returns)
-    pred_y_scaled = best_model.predict(X_test_scaled, verbose=0).reshape(-1, 1)
+    # predictions (log-returns and direction)
+    pred_outputs = best_model.predict(X_test_scaled, verbose=0)
+
+    if isinstance(pred_outputs, dict):
+        pred_y_scaled = pred_outputs["price"].reshape(-1, 1)
+        pred_dir_proba = pred_outputs["direction"].reshape(-1)
+    else:
+        pred_y_scaled = np.asarray(pred_outputs).reshape(-1, 1)
+        pred_dir_proba = np.zeros(len(pred_y_scaled), dtype=float)
+
     pred_logret = scaler_y.inverse_transform(pred_y_scaled).flatten()
     actual_logret = scaler_y.inverse_transform(y_test_scaled.reshape(-1, 1)).flatten()
+
+    # sanity check: predicted log-returns range
+    print("Min predicted logret:", float(np.min(pred_logret)))
+    print("Max predicted logret:", float(np.max(pred_logret)))
 
     # reconstruct next-day prices
     pred_price_t1 = price_t_test * np.exp(pred_logret)
