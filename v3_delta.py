@@ -173,8 +173,8 @@ def main():
     )
 
     early_stop = EarlyStopping(monitor="val_loss", patience=10, restore_best_weights=True)
-    checkpoint_path = "v3_delta.h5"
-    checkpoint = ModelCheckpoint(checkpoint_path, monitor="val_loss", save_best_only=True, save_format='h5')
+    checkpoint_path = "v3_delta.keras"
+    checkpoint = ModelCheckpoint(checkpoint_path, monitor="val_loss", save_best_only=True)
 
     model.fit(
         X_train_scaled,
@@ -186,10 +186,10 @@ def main():
         verbose=1,
     )
 
-    best_model = load_model(checkpoint_path)
+    best_model = load_model(checkpoint_path, compile=False)
     
-    # Save the final model in .h5 format
-    best_model.save("v3_delta.h5")
+    # Save the final model in Keras format
+    best_model.save("v3_delta.keras")
 
     # predictions (log-returns and direction)
     pred_outputs = best_model.predict(X_test_scaled, verbose=0)
