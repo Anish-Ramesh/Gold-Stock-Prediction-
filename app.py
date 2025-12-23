@@ -13,7 +13,7 @@ app = Flask(__name__)
 
 # --- Global Configuration ---
 CSV_PATH = "TataPower_2005_2025.csv"
-MODEL_PATH = "v3_delta.keras"
+MODEL_PATH = "v3_delta.h5"  # Using .h5 for better compatibility with Keras versions
 SCALER_X_PATH = "v3_delta_scaler_X.pkl"
 SCALER_Y_PATH = "v3_delta_scaler_y.pkl"
 WINDOW_SIZE = 14
